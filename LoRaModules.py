@@ -1,5 +1,11 @@
 from cryptography.hazmat.primitives.asymmetric import ed25519
+from prometheus_client import Gauge, REGISTRY
 from ByteRead import readBytes
+
+def getNodeClass(type_byte):
+    if type_byte == bytes([0x01]):
+        return Module_ENS160_AHT21
+    return None
 
 class Module_ENS160_AHT21:
     _DEVICE_TYPE_LEN = 1
@@ -30,6 +36,30 @@ class Module_ENS160_AHT21:
     aqi = None
 
     pubKey = bytes([185, 185, 210, 10, 252, 37, 248, 37, 157, 194, 141, 137, 58, 217, 3, 31, 6, 147, 230, 156, 152, 252, 192, 225, 180, 231, 227, 180, 105, 225, 249, 127])
+
+
+    def __init__(self):
+        labels = ['unique_id', 'device_type']
+        self.uniqueID    = Gauge('irs_lora_unique_id', 'Chip ID of the node', labels)
+        self.time        = Gauge('irs_lora_time', 'Timestamp of the node clock', labels)
+        self.battery     = Gauge('irs_lora_battery', 'Battery voltage of the node (mV)', labels)
+        self.temperature = Gauge('irs_lora_temperature', 'Measured temperature (°C)', labels)
+        self.humidity    = Gauge('irs_lora_humidity', 'Measured humidity (%RH)', labels)
+        self.co2         = Gauge('irs_lora_co2', 'Measured CO2 (ppm)', labels)
+        self.tvoc        = Gauge('irs_lora_tvoc', 'Measured TVOC (ppb)', labels)
+        self.ethoh       = Gauge('irs_lora_ethoh (ppb)')
+        self.aqi         = Gauge('irs_lora_aqi (-)')
+        REGISTRY.register(self.uniqueID)
+        REGISTRY.register(self.time)
+        REGISTRY.register(self.battery)
+        REGISTRY.register(self.temperature)
+        REGISTRY.register(self.humidity)
+        REGISTRY.register(self.co2)
+        REGISTRY.register(self.tvoc)
+        REGISTRY.register(self.ethoh)
+        REGISTRY.register(self.aqi)
+
+
     def parseMessage(self, message):
         pubKey = ed25519.Ed25519PublicKey.from_public_bytes(self.pubKey)
         pubKey.verify(message[-64:], message[:-64])
@@ -38,7 +68,7 @@ class Module_ENS160_AHT21:
             raise ValueError("Device type does not match")
         message = message[self._DEVICE_TYPE_LEN:]
         
-        self.uniqueID = readBytes(message[:self._UNIQUE_ID_LEN])
+        uniqueID = readBytes(message[:self._UNIQUE_ID_LEN])
         message  = message[self._UNIQUE_ID_LEN:]
         
         self.time    = readBytes(message[:self._TIME_LEN])
@@ -47,23 +77,33 @@ class Module_ENS160_AHT21:
         #battery = message[:_BATTERY_LEN]
         #message = message[_BATTERY_LEN:]
         
-        self.temperature = readBytes(message[:self._TEMPERATURE_LEN])
-        self.temperature /= self._TEMPERATURE_FACTOR
-        self.temperature -= self._TEMPERATURE_OFFSET
+        temperature = readBytes(message[:self._TEMPERATURE_LEN])
+        temperature /= self._TEMPERATURE_FACTOR
+        temperature -= self._TEMPERATURE_OFFSET
         message     = message[self._TEMPERATURE_LEN:]
 
-        self.humidity = readBytes(message[:self._HUMIDITY_LEN])
-        self.humidity /= self._HUMIDITY_FACTOR
+        humidity = readBytes(message[:self._HUMIDITY_LEN])
+        humidity /= self._HUMIDITY_FACTOR
         message  = message[self._HUMIDITY_LEN:]
 
-        self.co2     = readBytes(message[:self._CO2_LEN])
+        co2     = readBytes(message[:self._CO2_LEN])
         message = message[self._CO2_LEN:]
 
-        self.tvoc    = readBytes(message[:self._TVOC_LEN])
+        tvoc    = readBytes(message[:self._TVOC_LEN])
         message = message[self._TVOC_LEN:]
 
-        self.ethoh   = readBytes(message[:self._ETHOH_LEN])
+        ethoh   = readBytes(message[:self._ETHOH_LEN])
         message = message[self._ETHOH_LEN:]
 
-        self.aqi     = readBytes(message[:self._AQI_LEN])
+        aqi     = readBytes(message[:self._AQI_LEN])
         message = message[self._AQI_LEN:]
+
+        labels = {'unique_id': uniqueID, 'device_type': int(seld.typeID)}
+        self.uniqueID.labels(**labels).set(uniqueID)
+        self.time.labels(**labels).set(time)
+        self.temperature.labels(**labels).set(temperature)
+        self.humidity.labels(**labels).set(humidity)
+        self.co2.labels(**labels).set(co2)
+        self.tvoc.labels(**labels).set(tvoc)
+        self.ethoh.labels(**labels).set(ethoh)
+        self.aqi.labels(**labels).set(aqi)
