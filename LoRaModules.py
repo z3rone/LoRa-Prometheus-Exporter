@@ -19,6 +19,7 @@ class Module_ENS160_AHT21:
     _HUMIDITY_FACTOR = 100
 
     typeID = bytes([0x01])
+    uniqueID = None
     time = None
     battery = None # TODO
     temperature = None
