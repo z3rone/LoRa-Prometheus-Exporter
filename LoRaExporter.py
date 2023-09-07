@@ -1,9 +1,11 @@
-#python3
+#!/usr/bin/python3
+from prometheus_client import start_http_server, Summary
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from LoRaRF import SX127x
 import RPi.GPIO as GPIO
 import signal
 import sys
+import os
 import time
 
 import LoRaModules
@@ -16,6 +18,7 @@ def cleanup(signal, frame):
 
 
 signal.signal(signal.SIGINT, cleanup)
+signal.signal(signal.SIGTERM, cleanup)
 
 
 def verifiyMessage(message):
@@ -43,17 +46,20 @@ try:
     
     while True:
         LoRa.request()
-        LoRa.wait()
+        LoRa.wait(0.1)
         message = bytes([])
         while LoRa.available() > 0:
             byte = LoRa.read()
             message += bytes([byte])
-            print(hex(byte), end=" ")
         if verifiyMessage(message):
             nodeID = getUniqueID(message)
-            if !nodes[nodeID]:
+            if not nodeID in nodes.keys():
                 nodes[nodeID] = LoRaModules.getNodeClass(message[0])()
-            nodes[nodeID].parse(message)
+                print(f"New node: {hex(nodeID)}")
+            if os.environ.get('DEBUG', False):
+                print(message.hex(' '))
+            nodes[nodeID].parseMessage(message)
+        time.sleep(0.01)
         
 except KeyboardInterrupt:
     pass
