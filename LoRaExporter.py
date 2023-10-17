@@ -41,9 +41,9 @@ nodes = {}
 
 try:
     LoRa = SX127x()
-    LoRa.begin(bus=0, cs=0, reset=27, irq=22)
+    LoRa.begin(bus=0, cs=0, reset=27, irq=25)
     LoRa.setFrequency(868000000)
-    
+    print("LoRa module set-up")
     while True:
         LoRa.request()
         LoRa.wait(0.1)
@@ -59,7 +59,7 @@ try:
             if os.environ.get('DEBUG', False):
                 print(message.hex(' '))
             nodes[nodeID].parseMessage(message)
-        time.sleep(0.01)
+        time.sleep(1.0)
         
 except KeyboardInterrupt:
     pass
