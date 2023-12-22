@@ -1,6 +1,9 @@
 from cryptography.hazmat.primitives.asymmetric import ed25519
-from prometheus_client import Gauge, REGISTRY
 from ByteRead import readBytes
+import os
+import mysql.connector
+from datetime import datetime
+import time
 
 def getNodeClass(type_id):
     if type_id == 0x01:
@@ -26,6 +29,8 @@ class Module_ENS160_AHT21:
 
     _HUMIDITY_FACTOR = 100
 
+    _mysql_conn = None
+
     typeID = bytes([0x01])
     uniqueID = None
     time = None
@@ -42,27 +47,27 @@ class Module_ENS160_AHT21:
 
     def __init__(self):
         labels = ['unique_id', 'device_type']
-        self.uniqueID    = Gauge('irs_lora_unique_id', 'Chip ID of the node', labels)
-        self.time        = Gauge('irs_lora_time', 'Timestamp of the node clock', labels)
-        self.battery     = Gauge('irs_lora_battery', 'Battery voltage of the node (mV)', labels)
-        self.temperature = Gauge('irs_lora_temperature', 'Measured temperature (°C)', labels)
-        self.humidity    = Gauge('irs_lora_humidity', 'Measured humidity (%RH)', labels)
-        self.co2         = Gauge('irs_lora_co2', 'Measured CO2 (ppm)', labels)
-        self.tvoc        = Gauge('irs_lora_tvoc', 'Measured TVOC (ppb)', labels)
-        self.ethoh       = Gauge('irs_lora_ethoh', 'Measured EthOH (ppb)', labels)
-        self.aqi         = Gauge('irs_lora_aqi', 'Measured AQI (-)', labels)
-        #REGISTRY.register(self.uniqueID)
-        #REGISTRY.register(self.time)
-        #REGISTRY.register(self.battery)
-        #REGISTRY.register(self.temperature)
-        #REGISTRY.register(self.humidity)
-        #REGISTRY.register(self.co2)
-        #REGISTRY.register(self.tvoc)
-        #REGISTRY.register(self.ethoh)
-        #REGISTRY.register(self.aqi)
+        db_config = {
+            'host':     os.getenv('MYSQL_HOST',     'localhost'),
+            'user':     os.getenv('MYSQL_USER',     'grafana'),
+            'password': os.getenv('MYSQL_PASSWORD', 'grafana'),
+            'database': os.getenv('MYSQL_DATABASE', 'grafana')
+        }
+        self._mysql_conn = mysql.connector.connect(**db_config)
 
+
+    def _store_datapoint(self, metric_name, value, timestamp, labels):
+        cursor = self._mysql_conn.cursor()
+        insert_query = 'INSERT INTO metrics (timestamp, metric, value, tags) VALUES (FROM_UNIXTIME(%s), %s, %s, %s)'
+        labels_string = ",".join([ f"{key}={value}" for key, value in labels.items() ])
+        values = (timestamp, metric_name, value, labels_string)
+        cursor.execute(insert_query, values)
+        self._mysql_conn.commit()
+        cursor.close()
 
     def parseMessage(self, message):
+        _datapoint_time = int(time.time())
+
         pubKey = ed25519.Ed25519PublicKey.from_public_bytes(self.pubKey)
         pubKey.verify(message[-64:], message[:-64])
         
@@ -101,14 +106,14 @@ class Module_ENS160_AHT21:
         message = message[self._AQI_LEN:]
 
         labels = {'unique_id': hex(_uniqueID), 'device_type': hex(int.from_bytes(self.typeID, byteorder='little'))}
-        self.uniqueID.labels(**labels).set(_uniqueID)
-        self.time.labels(**labels).set(_time)
-        self.temperature.labels(**labels).set(_temperature)
-        self.humidity.labels(**labels).set(_humidity)
-        self.co2.labels(**labels).set(_co2)
-        self.tvoc.labels(**labels).set(_tvoc)
-        self.ethoh.labels(**labels).set(_ethoh)
-        self.aqi.labels(**labels).set(_aqi)
+        self._store_datapoint('irs_lora_unique_id',   _uniqueID,    _datapoint_time, labels)
+        self._store_datapoint('irs_lora_time',        _time,        _datapoint_time, labels)
+        self._store_datapoint('irs_lora_temperature', _temperature, _datapoint_time, labels)
+        self._store_datapoint('irs_lora_humidity',    _humidity,    _datapoint_time, labels)
+        self._store_datapoint('irs_lora_co2',         _co2,         _datapoint_time, labels)
+        self._store_datapoint('irs_lora_tvoc',        _tvoc,        _datapoint_time, labels)
+        self._store_datapoint('irs_lora_ethoh',       _ethoh,       _datapoint_time, labels)
+        self._store_datapoint('irs_lora_aqi',         _aqi,         _datapoint_time, labels)
 
 class Module_VEML7700:
     _DEVICE_TYPE_LEN = 1
@@ -119,6 +124,8 @@ class Module_VEML7700:
 
     _LUX_FACTOR = 100.0
     _BATTERY_FACTOR = 100.0
+    
+    _mysql_conn = None
 
     typeID = bytes([0x02])
     uniqueID = None
@@ -130,12 +137,28 @@ class Module_VEML7700:
 
     def __init__(self):
         labels = ['unique_id', 'device_type']
-        self.uniqueID    = Gauge('irs_lora_unique_id', 'Chip ID of the node', labels)
-        self.battery     = Gauge('irs_lora_battery', 'Battery voltage of the node (mV)', labels)
-        self.lux         = Gauge('irs_lora_lux', 'Measured Lux (lux)', labels)
+        db_config = {
+            'host':     os.getenv('MYSQL_HOST',     'localhost'),
+            'user':     os.getenv('MYSQL_USER',     'grafana'),
+            'password': os.getenv('MYSQL_PASSWORD', 'grafana'),
+            'database': os.getenv('MYSQL_DATABASE', 'grafana')
+        }
+        self._mysql_conn = mysql.connector.connect(**db_config)
+
+
+    def _store_datapoint(self, metric_name, value, timestamp, labels):
+        cursor = self._mysql_conn.cursor()
+        insert_query = 'INSERT INTO metrics (timestamp, metric, value, tags) VALUES (%s, %s, %s, %s)'
+        labels_string = ",".join([ f"{key}={value}" for key, value in labels.items() ])
+        values = (timestamp, metric_name, value, labels_string)
+        cursor.execute(insert_query, values)
+        self._mysql_conn.commit()
+        cursor.close()
 
 
     def parseMessage(self, message):
+        _datapoint_time = int(time.time())
+
         pubKey = ed25519.Ed25519PublicKey.from_public_bytes(self.pubKey)
         pubKey.verify(message[-64:], message[:-64])
         
@@ -155,6 +178,5 @@ class Module_VEML7700:
         message = message[self._LUX_LEN:]
 
         labels = {'unique_id': hex(_uniqueID), 'device_type': hex(int.from_bytes(self.typeID, byteorder='little'))}
-        self.uniqueID.labels(**labels).set(_uniqueID)
-        self.battery.labels(**labels).set(_battery)
-        self.lux.labels(**labels).set(_lux)
+        self._store_datapoint('irs_lora_unique_id',   _uniqueID,    _datapoint_time, labels)
+        self._store_datapoint('irs_lora_lux',         _lux,         _datapoint_time, labels)

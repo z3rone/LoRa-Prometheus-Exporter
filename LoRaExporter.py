@@ -41,7 +41,7 @@ nodes = {}
 
 try:
     LoRa = SX127x()
-    LoRa.begin(bus=0, cs=0, reset=27, irq=25)
+    LoRa.begin(bus=0, cs=0, reset=27, irq=-1)
     LoRa.setFrequency(868000000)
     print("LoRa module set-up")
     while True:
