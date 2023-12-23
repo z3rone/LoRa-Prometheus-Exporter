@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-from prometheus_client import start_http_server, Summary
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from LoRaRF import SX127x
 import RPi.GPIO as GPIO
@@ -35,7 +34,6 @@ def getUniqueID(message):
     return int.from_bytes(message[1:9], byteorder='big', signed=False)
     
 
-start_http_server(8000)
 nodes = {}
 
 

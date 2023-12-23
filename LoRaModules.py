@@ -58,7 +58,7 @@ class Module_ENS160_AHT21:
 
     def _store_datapoint(self, metric_name, value, timestamp, labels):
         cursor = self._mysql_conn.cursor()
-        insert_query = 'INSERT INTO metrics (timestamp, metric, value, tags) VALUES (FROM_UNIXTIME(%s), %s, %s, %s)'
+        insert_query = 'INSERT INTO metrics (timestamp, name, value, tags) VALUES (FROM_UNIXTIME(%s), %s, %s, %s)'
         labels_string = ",".join([ f"{key}={value}" for key, value in labels.items() ])
         values = (timestamp, metric_name, value, labels_string)
         cursor.execute(insert_query, values)
@@ -148,7 +148,7 @@ class Module_VEML7700:
 
     def _store_datapoint(self, metric_name, value, timestamp, labels):
         cursor = self._mysql_conn.cursor()
-        insert_query = 'INSERT INTO metrics (timestamp, metric, value, tags) VALUES (%s, %s, %s, %s)'
+        insert_query = 'INSERT INTO metrics (timestamp, name, value, tags) VALUES (FROM_UNIXTIME(%s), %s, %s, %s)'
         labels_string = ",".join([ f"{key}={value}" for key, value in labels.items() ])
         values = (timestamp, metric_name, value, labels_string)
         cursor.execute(insert_query, values)
@@ -179,4 +179,5 @@ class Module_VEML7700:
 
         labels = {'unique_id': hex(_uniqueID), 'device_type': hex(int.from_bytes(self.typeID, byteorder='little'))}
         self._store_datapoint('irs_lora_unique_id',   _uniqueID,    _datapoint_time, labels)
+        self._store_datapoint('irs_lora_battery',     _battery,     _datapoint_time, labels)
         self._store_datapoint('irs_lora_lux',         _lux,         _datapoint_time, labels)
